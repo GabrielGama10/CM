@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <title>Controle Financeiro</title>
+
+    <!-- Força o app a rodar em tela cheia no iPhone -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Gestão CM" />
+
+    <!-- Define a cor do tema para o navegador -->
+    <meta name="theme-color" content="#09090b" />
+
+    <!-- Pinta o fundo de escuro instantaneamente para evitar o "clarão branco" -->
+    <style>
+      body { background-color: #09090b; margin: 0; }
+    </style>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- AQUI ESTÁ O SEGREDO: Apontando para o arquivo fonte correto -->
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

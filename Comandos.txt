@@ -1,0 +1,5 @@
+cd C:\CM - V2
+
+pnpm run build
+
+firebase deploy --only hosting
