@@ -18,6 +18,24 @@ const MESES = [
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
 ];
 
+// Dicionários baseados na lógica da sua EmprestimosPage.tsx
+const DEFAULT_CARTOES_HEX: Record<string, { nome: string; cor: string }> = {
+  nubank: { nome: "Nubank", cor: "#a855f7" }, // purple-500
+  inter: { nome: "Banco Inter", cor: "#f97316" }, // orange-500
+  mercado_pago: { nome: "Mercado Pago", cor: "#3b82f6" }, // blue-500
+  picpay: { nome: "PicPay", cor: "#10b981" }, // emerald-500
+  outros: { nome: "Outros (PIX/Dinheiro)", cor: "#a1a1aa" } // zinc-400
+};
+
+const PALETA_HEX: Record<string, string> = {
+  purple: "#a855f7",
+  orange: "#f97316",
+  blue: "#3b82f6",
+  emerald: "#10b981",
+  pink: "#ec4899",
+  zinc: "#a1a1aa"
+};
+
 // --- Utilitários de Simulação ---
 
 function useFirestoreQuery(
@@ -38,12 +56,12 @@ function useFirestoreQuery(
 
     try {
       let q = query(collection(db, collectionName), where("userId", "==", user.uid));
-      conditions.forEach((c) => {
+      conditions.forEach((c: any) => {
         q = query(q, where(c.field, c.op, c.value));
       });
 
       const snapshot = await getDocs(q);
-      const results = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
+      const results = snapshot.docs.map((doc: any) => ({ ...doc.data(), id: doc.id }));
       setData(results);
     } catch (error) {
       console.error(`Erro ao buscar ${collectionName}:`, error);
@@ -54,7 +72,7 @@ function useFirestoreQuery(
 
   useEffect(() => {
     refetch();
-    const unsubscribe = auth.onAuthStateChanged((user) => {
+    const unsubscribe = auth.onAuthStateChanged((user: any) => {
       if (user) refetch();
     });
     return () => unsubscribe();
@@ -117,11 +135,13 @@ export function useDashboard() {
       const qUserId = where("userId", "==", user.uid);
       const qAno = where("ano", "==", ano);
 
-      const [snapRendas, snapDespesas, snapTrans, snapReservas] = await Promise.all([
+      const [snapRendas, snapDespesas, snapTrans, snapReservas, snapCartoes, snapEmprestimos] = await Promise.all([
         getDocs(query(collection(db, "rendas"), qUserId, qAno)),
         getDocs(query(collection(db, "despesasFixas"), qUserId, qAno)),
         getDocs(query(collection(db, "transacoes"), qUserId, qAno)),
-        getDocs(query(collection(db, "reservas"), qUserId, qAno))
+        getDocs(query(collection(db, "reservas"), qUserId, qAno)),
+        getDocs(query(collection(db, "cartoes"), qUserId)),
+        getDocs(query(collection(db, "emprestimos"), qUserId, qAno))
       ]);
 
       let mRendas = 0;
@@ -145,7 +165,19 @@ export function useDashboard() {
       let totalAnualGuardado = 0;
       let totalAnualMetaReserva = 0;
 
-      snapRendas.forEach(doc => {
+      // Montando a lista completa de cartões (Legado + Cadastrados) igual na EmprestimosPage
+      const listaCartoes: Record<string, { nome: string; cor: string }> = { ...DEFAULT_CARTOES_HEX };
+      snapCartoes.forEach((doc: any) => {
+        const c = doc.data();
+        listaCartoes[doc.id] = {
+          nome: c.nome,
+          cor: PALETA_HEX[c.cor] || PALETA_HEX.zinc
+        };
+      });
+
+      const faturasAgrupadas: Record<string, { pessoal: number; emprestado: number; total: number }> = {};
+
+      snapRendas.forEach((doc: any) => {
         const data = doc.data();
         const v = Number(data.valor || 0);
         const m = Number(data.mes);
@@ -157,7 +189,7 @@ export function useDashboard() {
         }
       });
 
-      snapDespesas.forEach(doc => {
+      snapDespesas.forEach((doc: any) => {
         const data = doc.data();
         const v = Number(data.valor || 0);
         const m = Number(data.mes);
@@ -169,7 +201,7 @@ export function useDashboard() {
         }
       });
 
-      snapTrans.forEach(doc => {
+      snapTrans.forEach((doc: any) => {
         const data = doc.data();
         const v = Number(data.valor || 0);
         const m = Number(data.mes);
@@ -181,7 +213,16 @@ export function useDashboard() {
             totalAnualRendas += v; 
           }
         } else {
-          if (m === mes) mTransDespesas += v;
+          if (m === mes) {
+            mTransDespesas += v;
+            
+            if (data.cartao && data.cartao.trim() !== "") {
+              const cKey = data.cartao;
+              if (!faturasAgrupadas[cKey]) faturasAgrupadas[cKey] = { pessoal: 0, emprestado: 0, total: 0 };
+              faturasAgrupadas[cKey].pessoal += v;
+              faturasAgrupadas[cKey].total += v;
+            }
+          }
           if (m >= 1 && m <= 12) { 
             annualMap[m-1].despesas += v; 
             totalAnualDespesas += v; 
@@ -189,7 +230,7 @@ export function useDashboard() {
         }
       });
 
-      snapReservas.forEach(doc => {
+      snapReservas.forEach((doc: any) => {
         const data = doc.data();
         const v = Number(data.valor || 0);
         const meta = Number(data.meta || 0);
@@ -207,6 +248,43 @@ export function useDashboard() {
         }
       });
 
+      snapEmprestimos.forEach((doc: any) => {
+        const data = doc.data();
+        const v = Number(data.valor || 0);
+        const m = Number(data.mes);
+
+        if (m === mes && data.cartao && data.cartao.trim() !== "") {
+          const cKey = data.cartao;
+          if (!faturasAgrupadas[cKey]) faturasAgrupadas[cKey] = { pessoal: 0, emprestado: 0, total: 0 };
+          faturasAgrupadas[cKey].emprestado += v;
+          faturasAgrupadas[cKey].total += v;
+        }
+      });
+
+      const faturasDetalhadas = Object.keys(faturasAgrupadas).map((key: string) => {
+        // Puxamos diretamente da sua lógica combinada!
+        const configCartao = listaCartoes[key] || { 
+          nome: key.toUpperCase(), 
+          cor: "#888888" 
+        };
+
+        // 1. Arredondamos as partes individuais cravando 2 casas decimais
+        const pessoalArredondado = Math.round(faturasAgrupadas[key].pessoal * 100) / 100;
+        const emprestadoArredondado = Math.round(faturasAgrupadas[key].emprestado * 100) / 100;
+        
+        // 2. Somamos os valores já arredondados para garantir que a soma bate com a tela
+        const totalCalculado = pessoalArredondado + emprestadoArredondado;
+
+        return {
+          id: key,
+          nome: configCartao.nome,
+          cor: configCartao.cor,
+          pessoal: pessoalArredondado,
+          emprestado: emprestadoArredondado,
+          total: totalCalculado
+        };
+      }).sort((a: any, b: any) => b.total - a.total); 
+
       const receitas = mRendas + mTransReceitas;
       const despesas = mDespesasFixas + mTransDespesas;
       const deducaoDaReserva = Math.max(mMetaReserva, mValorGuardado);
@@ -221,15 +299,16 @@ export function useDashboard() {
           custoFixo: receitas > 0 ? (mDespesasFixas / receitas) * 100 : 0,
           custoVariavel: receitas > 0 ? (mTransDespesas / receitas) * 100 : 0,
           guardado: receitas > 0 ? (mValorGuardado / receitas) * 100 : 0,
-        }
+        },
+        faturas: faturasDetalhadas
       });
       
-      annualMap.forEach(item => { 
+      annualMap.forEach((item: any) => { 
         const deducaoReservaAnual = Math.max(item.meta, item.guardado);
         item.saldo = item.receitas - item.despesas - deducaoReservaAnual; 
       });
       
-      const mesesComDespesa = annualMap.filter(m => m.despesas > 0).length;
+      const mesesComDespesa = annualMap.filter((m: any) => m.despesas > 0).length;
       const divisorMedia = mesesComDespesa > 0 ? mesesComDespesa : 1;
 
       setAnnualData({
@@ -250,7 +329,7 @@ export function useDashboard() {
 
   useEffect(() => {
     fetchDashboard();
-    const unsubscribe = auth.onAuthStateChanged((user) => {
+    const unsubscribe = auth.onAuthStateChanged((user: any) => {
       if (user) fetchDashboard();
     });
     return () => unsubscribe();
@@ -582,7 +661,6 @@ export function useEmprestimos() {
     if (!userId) throw new Error("Não autenticado");
     const momentoExato = Date.now();
 
-    // A MESMA MÁGICA DE PARCELAMENTO DOS CARTÕES APLICADA AQUI
     if (data.parcelado && data.qtdParcelas > 1) {
       const batch = writeBatch(db);
       const valorParcela = data.valor / data.qtdParcelas;
@@ -602,7 +680,7 @@ export function useEmprestimos() {
           descricao: `${data.descricao} (${i + 1}/${data.qtdParcelas})`,
           valor: valorParcela,
           cartao: data.cartao,
-          dataCompra: data.dataCompra, // Salva a data
+          dataCompra: data.dataCompra,
           mes: mesAtual,
           ano: anoAtual,
           userId,
@@ -616,7 +694,7 @@ export function useEmprestimos() {
         descricao: data.descricao,
         valor: data.valor,
         cartao: data.cartao,
-        dataCompra: data.dataCompra, // Salva a data
+        dataCompra: data.dataCompra,
         mes: data.mes,
         ano: data.ano,
         userId,

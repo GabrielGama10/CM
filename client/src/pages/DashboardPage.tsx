@@ -78,7 +78,7 @@ export default function DashboardPage() {
       </div>
 
       {visao === "mensal" ? (
-        <>
+        <div className="space-y-6">
           {/* CARDS VISÃO MENSAL */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <SummaryCard title="Renda Total" value={data?.receitas ?? 0} icon={<TrendingUp className="w-5 h-5" />} color="emerald" />
@@ -93,20 +93,17 @@ export default function DashboardPage() {
             <KPICard title="Custo Variável" value={data?.kpis?.custoVariavel ?? 0} meta={metas.variavel} description={`Meta: até ${metas.variavel}% da renda`} status={(data?.kpis?.custoVariavel ?? 0) <= metas.variavel ? "success" : "warning"} />
             <KPICard title="Guardado" value={data?.kpis?.guardado ?? 0} meta={metas.reserva} description={`Meta: pelo menos ${metas.reserva}% da renda`} status={(data?.kpis?.guardado ?? 0) >= metas.reserva ? "success" : "warning"} invert />
           </div>
-        </>
+        </div>
       ) : (
-        <>
+        <div className="space-y-6">
           {/* CARDS VISÃO ANUAL */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <SummaryCard title="Total Ganho no Ano" value={annual?.totalReceitas ?? 0} icon={<TrendingUp className="w-5 h-5" />} color="emerald" />
             <SummaryCard title="Total Gasto no Ano" value={annual?.totalDespesas ?? 0} icon={<TrendingDown className="w-5 h-5" />} color="rose" />
-            
-            {/* O SUBTITLE FOI ADICIONADO NESTA LINHA ABAIXO: */}
             <SummaryCard title="Total Acumulado (Reserva)" value={annual?.totalGuardado ?? 0} subtitle={`Meta de reserva: ${formatCurrency(annual?.totalMetaReserva ?? 0)}`} icon={<PiggyBank className="w-5 h-5" />} color="violet" />
-            
             <SummaryCard title="Média de Gasto Mensal" value={annual?.mediaDespesas ?? 0} subtitle="Baseado nos meses corridos" icon={<Target className="w-5 h-5" />} color="orange" />
           </div>
-        </>
+        </div>
       )}
 
       {/* GRÁFICO ANUAL (Aparece nas duas visões, mas é o foco da visão anual) */}
@@ -136,6 +133,45 @@ export default function DashboardPage() {
                   <Bar dataKey="saldo" name="Saldo Livre" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* FECHAMENTO DE CARTÕES (Abaixo do Gráfico) */}
+      {visao === "mensal" && data?.faturas && data.faturas.length > 0 && (
+        <Card className="border-border/50">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <CreditCard className="w-5 h-5 text-zinc-400" />
+              Fechamento de Cartões
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {data.faturas.map((fatura: any) => (
+                <div key={fatura.id} className="relative p-4 rounded-lg bg-zinc-900 border border-zinc-800 flex flex-col gap-2 overflow-hidden shadow-sm">
+                  {/* Faixa lateral com a cor do cartão */}
+                  <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ backgroundColor: fatura.cor }} />
+                  
+                  <div className="flex justify-between items-center pl-2">
+                    <span className="text-sm font-medium text-zinc-200">{fatura.nome}</span>
+                    <span className="text-lg font-bold text-foreground">{formatCurrency(fatura.total)}</span>
+                  </div>
+                  
+                  {/* Sub-valores: Pessoal vs Emprestado */}
+                  <div className="flex justify-between text-xs text-muted-foreground pl-2 mt-2 border-t border-zinc-800/80 pt-3">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] uppercase tracking-wider mb-0.5">Meus Gastos</span>
+                      <span className="font-medium text-zinc-300">{formatCurrency(fatura.pessoal)}</span>
+                    </div>
+                    <div className="flex flex-col text-right">
+                      <span className="text-[10px] uppercase tracking-wider mb-0.5">Emprestado</span>
+                      <span className="font-medium text-zinc-300">{formatCurrency(fatura.emprestado)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
@@ -181,7 +217,6 @@ function KPICard({ title, value, meta, description, status, invert }: {
   title: string; value: number; meta: number; description: string;
   status: "success" | "warning"; invert?: boolean;
 }) {
-  // Trava matemática: se a meta não existir ou for zero, calcula baseado em 1 para não quebrar a barra (divisão por zero)
   const safeMeta = meta > 0 ? meta : 1; 
   const progressValue = Math.min(100, Math.max(0, (value / safeMeta) * 100));
   
@@ -197,7 +232,6 @@ function KPICard({ title, value, meta, description, status, invert }: {
           </span>
         </div>
         
-        {/* Barra de Progresso Nativa e Dinâmica */}
         <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
           <div 
             className={`h-full ${barColor} transition-all duration-500 ease-out`} 
